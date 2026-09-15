@@ -141,7 +141,15 @@ DATA.captar.forEach(c=>{const col=c.pr==='alta'?'#dc2626':'#f59e0b';
 const gTienda=L.layerGroup();
 DATA.tienda.forEach(t=>{const col=heatColor(t.v/100);
  L.circleMarker([t.lat,t.lng],{radius:4+(t.v/100)*10,color:'#111',weight:.8,fillColor:col,fillOpacity:.85})
-  .bindPopup(`<b>🏬 ABRIR TIENDA OFICIAL</b><br><b>${t.l}</b>, ${t.p}<br>V_abs <b>${t.v}</b>${t.vpc!==null?' · V_pc '+t.vpc:''}<br>online $ ${(t.pag/1e6).toFixed(1)}M · comp ${t.c} · multi ${t.mu} · MONTAGNE may. ${t.m}`).addTo(gTienda);});
+  .bindPopup(`<b>🏬 ABRIR TIENDA OFICIAL</b><br><b>${t.l}</b>, ${t.p}<br>V_abs <b>${t.v}</b>${t.vpc!==null?' · V_pc '+t.vpc:''}<br>online $ ${(t.pag/1e6).toFixed(1)}M · comp ${t.c} · multi ${t.mu} · MONTAGNE may. ${t.m}<br><span style="color:#888;font-size:11px">ubicación: ${t.geo==='centroide'?'centroide de sus puntos outdoor':'centro de la localidad (padrón)'}</span>`).addTo(gTienda);});
+// ---- HUELLA COMERCIAL: donde MONTAGNE ya vende (incluye los mayoristas) ----
+// El footprint no trae direcciones, solo localidad: el punto es el centro de la
+// localidad. Sin esta capa los 309 mayoristas y 53 franquicias no se ven en ningun lado.
+const gHuella=L.layerGroup();
+DATA.huella.forEach(h=>{const tot=h.P+h.F+h.M;
+ const col=h.P>0?'#E2001A':(h.F>0?'#0d9488':'#8b5cf6');
+ L.circleMarker([h.lat,h.lng],{radius:3+Math.min(9,Math.sqrt(tot)*2.2),color:'#fff',weight:1,fillColor:col,fillOpacity:.75})
+  .bindPopup(`<b class=k>HUELLA MONTAGNE</b><br><b>${h.n}</b>, ${h.p}<br>${h.P} propios · ${h.F} franquicias · <b>${h.M} mayoristas</b><br><span style="color:#888;font-size:11px">punto = centro de la localidad: el listado interno no trae direcciones de franquicias ni mayoristas</span>`).addTo(gHuella);});
 L.control.layers({'Mapa claro':bClaro,'Calles':bCalles,'Topográfico':bTopo,'Satélite':bSat},{
  '🗺️ ESFUERZO de marca · provincia':capaProv,
  '🌎 ESFUERZO de marca · región':capaReg,
@@ -153,10 +161,11 @@ L.control.layers({'Mapa claro':bClaro,'Calles':bCalles,'Topográfico':bTopo,'Sat
  '▲ Competencia (90)':gComp,
  '▣ Multimarca outdoor (217)':gMulti,
  '🎯 Captar multimarca (211)':gCaptar,
- '🏬 Abrir tienda oficial (24)':gTienda
+ '🏬 Abrir tienda oficial (179)':gTienda,
+ '🟣 Huella MONTAGNE · P/F/M (235 localidades)':gHuella
 },{collapsed:false}).addTo(map);
 const t=L.control({position:'topleft'});t.onAdd=function(){const d=L.DomUtil.create('div','title');
- d.innerHTML='MONTAGNE — Mapa de expansión<br><span class=sub> Esfuerzo de presencia de marca · motor de co-locación · 11 capas</span>';return d};t.addTo(map);
+ d.innerHTML='MONTAGNE — Mapa de expansión<br><span class=sub> Esfuerzo de presencia de marca · motor de co-locación · 12 capas</span>';return d};t.addTo(map);
 const lg=L.control({position:'bottomright'});lg.onAdd=function(){const d=L.DomUtil.create('div','legend');
  L.DomEvent.disableClickPropagation(d);
  d.innerHTML=`<h4>Esfuerzo de presencia de marca</h4><div class=gesf></div><div class=row style="justify-content:space-between"><span>cubierto</span><span>esfuerzo alto</span></div>
@@ -170,7 +179,7 @@ const lg=L.control({position:'bottomright'});lg.onAdd=function(){const d=L.DomUt
  <h4>Locales MONTAGNE · 98</h4><div class=row><span class=dot style="background:#E2001A"></span>Calle</div><div class=row><span class=dot style="background:#8000ff"></span>Shopping</div><div class=row><span class=dot style="background:#ff8800"></span>Outlet</div>
  <h4>Candidatas · 16</h4><div class=row><span class=dot style="background:#d11149"></span>Greenfield</div><div class=row><span class=dot style="background:#0d9488"></span>Convertir</div><div class=row><span class=dot style="background:#475569"></span>Retail parcial</div>
  <h4>Polos ind./RIGI · 18</h4><div class=row><span class=sq style="background:#d40000"></span>Gap total</div><div class=row><span class=sq style="background:#ff9500"></span>Base sin local</div><div class=row><span class=sq style="background:#1aa11a"></span>Cubierto</div>
- <h4>Competencia monomarca · 90</h4><div class=row><span class=tri style="border-bottom:11px solid #000"></span>TNF·Salomon·Columbia·Merrell</div><div class=row><span class=tri style="border-bottom:11px solid #7c2d12"></span>Patagonia·Ansilta·Ombak</div><div class=row><span class=tri style="border-bottom:11px solid #0082c3"></span>Decathlon·Eddie Bauer·Rossignol</div><div class=row><span class=tri style="border-bottom:11px solid #ca8a04"></span>Rip Curl·Quiksilver·Billabong</div><div class=row><span class=tri style="border-bottom:11px solid #be123c"></span>Alpine Skate·Hummer·Campinox (arg)</div><h4>Multimarca outdoor · 217</h4><div class=row><span style="width:10px;height:10px;background:#ea7317;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>Vende competidores</div><div class=row><span style="width:10px;height:10px;background:#15803d;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>También vende MONTAGNE</div><h4>🎯 Captar multimarca · 211</h4><div class=row><span class=dot style="background:#dc2626"></span>Alta (MONTAGNE no vende ahí)</div><div class=row><span class=dot style="background:#f59e0b"></span>Media (ya hay mayorista)</div><div class=sub>tamaño = V_abs (canal 0.6 + demanda 0.4)</div><h4>🏬 Abrir tienda oficial · 24</h4><div class=grad></div><div class=row style="justify-content:space-between"><span>V bajo</span><span>V alto</span></div><div class=sub>localidades sin retail propio, coloreadas por V_abs</div></details>`;return d};lg.addTo(map);
+ <h4>Competencia monomarca · 90</h4><div class=row><span class=tri style="border-bottom:11px solid #000"></span>TNF·Salomon·Columbia·Merrell</div><div class=row><span class=tri style="border-bottom:11px solid #7c2d12"></span>Patagonia·Ansilta·Ombak</div><div class=row><span class=tri style="border-bottom:11px solid #0082c3"></span>Decathlon·Eddie Bauer·Rossignol</div><div class=row><span class=tri style="border-bottom:11px solid #ca8a04"></span>Rip Curl·Quiksilver·Billabong</div><div class=row><span class=tri style="border-bottom:11px solid #be123c"></span>Alpine Skate·Hummer·Campinox (arg)</div><h4>Multimarca outdoor · 217</h4><div class=row><span style="width:10px;height:10px;background:#ea7317;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>Vende competidores</div><div class=row><span style="width:10px;height:10px;background:#15803d;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>También vende MONTAGNE</div><h4>🎯 Captar multimarca · 211</h4><div class=row><span class=dot style="background:#dc2626"></span>Alta (MONTAGNE no vende ahí)</div><div class=row><span class=dot style="background:#f59e0b"></span>Media (ya hay mayorista)</div><div class=sub>tamaño = V_abs (canal 0.6 + demanda 0.4)</div><h4>🏬 Abrir tienda oficial · 179</h4><div class=grad></div><div class=row style="justify-content:space-between"><span>V bajo</span><span>V alto</span></div><div class=sub>localidades sin retail propio, coloreadas por V_abs</div><h4>🟣 Huella MONTAGNE · 235 localidades</h4><div class=row><span class=dot style="background:#E2001A"></span>Tiene local propio</div><div class=row><span class=dot style="background:#0d9488"></span>Solo franquicia</div><div class=row><span class=dot style="background:#8b5cf6"></span>Solo mayorista</div><div class=sub>tamaño = puntos de venta · el punto es el centro de la localidad: el listado interno no trae direcciones de franquicias ni mayoristas</div></details>`;return d};lg.addTo(map);
 const ASK={url:"https://kqwuvhfgykhjosglsznd.supabase.co/functions/v1/map-ask",key:"f11d29e631efdd48"};
 
 // ---- AGENTE: pregunta en castellano -> SQL sobre map_* -> respuesta ----
