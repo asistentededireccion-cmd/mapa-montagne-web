@@ -124,10 +124,14 @@ DATA.hubs.forEach(h=>{L.marker([h.lat,h.lng],{icon:L.divIcon({className:'',html:
   .bindPopup(`<b style="color:${stCol[h.st]}">POLO · ${stTxt[h.st]}</b><br><b>${h.n}</b><br>${h.base}, ${h.p}<br>${h.sec} · ${h.inv}`).addTo(gHub);});
 // COMPETENCIA
 const brand={'Salomon':'#1f6fb2','The North Face':'#000000','Columbia':'#16a34a','Merrell':'#b45309','Ansilta':'#7c3aed','Timberland':'#a16207','Ombak':'#db2777','Patagonia':'#7c2d12','Eddie Bauer':'#0e7490','Rossignol':'#4338ca','Decathlon':'#0082c3','Rip Curl':'#ca8a04','Quiksilver':'#0ea5e9','Billabong':'#334155','Alpine Skate':'#be123c','Hummer':'#78350f','Campinox':'#4d7c0f'};
-const gComp=L.layerGroup();
-DATA.comp.forEach(x=>{const col=brand[x.m]||'#333';
- L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:`<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid ${col};filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))"></div>`,iconSize:[14,13],iconAnchor:[7,13]})})
-  .bindPopup(`<b style="color:${col}">COMPETIDOR · ${x.m}</b><br>${x.ciu} · ${x.c}`).addTo(gComp);});
+// Se parte en dos capas: el core outdoor valida el mercado de otra forma que el
+// calzado o el surf/nieve (ver CATEGORIAS_CANAL en build.py).
+const CATTXT={outdoor_core:'outdoor',calzado:'calzado (adyacente)',surf_nieve:'surf/nieve (adyacente)'};
+const gComp=L.layerGroup(), gCompAdy=L.layerGroup();
+DATA.comp.forEach(x=>{const col=brand[x.m]||'#333';const core=x.cat==='outdoor_core';
+ L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:`<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid ${col};filter:drop-shadow(0 1px 1px rgba(0,0,0,.6));opacity:${core?1:.65}"></div>`,iconSize:[14,13],iconAnchor:[7,13]})})
+  .bindPopup(`<b style="color:${col}">COMPETIDOR · ${x.m}</b><br>${x.ciu} · ${x.c}<br><span style="color:#888;font-size:11px">${CATTXT[x.cat]||x.cat}${x.enCanal?'':' · no cuenta en el índice'}</span>`)
+  .addTo(core?gComp:gCompAdy);});
 const gMulti=L.layerGroup();
 DATA.multi.forEach(x=>{const col=x.mtg?'#15803d':'#ea7317';
  L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:`<div style="width:9px;height:9px;background:${col};border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div>`,iconSize:[9,9],iconAnchor:[4,4]})}).bindPopup(`<b style="color:${col}">MULTIMARCA OUTDOOR</b>${x.mtg?' · vende MONTAGNE':''}<br><b>${x.name}</b>${x.city?' — '+x.city:''}<br><span style="color:#555">vende: ${x.brands.join(', ')}</span>`).addTo(gMulti);});
@@ -158,14 +162,15 @@ L.control.layers({'Mapa claro':bClaro,'Calles':bCalles,'Topográfico':bTopo,'Sat
  '📍 Locales MONTAGNE (98)':gStores,
  '🔵 Candidatas (16)':gCand,
  '◆ Polos ind./RIGI (18)':gHub,
- '▲ Competencia (90)':gComp,
+ '▲ Competencia outdoor (57)':gComp,
+ '△ Adyacente: calzado/surf (33)':gCompAdy,
  '▣ Multimarca outdoor (217)':gMulti,
  '🎯 Captar multimarca (211)':gCaptar,
  '🏬 Abrir tienda oficial (179)':gTienda,
  '🟣 Huella MONTAGNE · P/F/M (235 localidades)':gHuella
 },{collapsed:false}).addTo(map);
 const t=L.control({position:'topleft'});t.onAdd=function(){const d=L.DomUtil.create('div','title');
- d.innerHTML='MONTAGNE — Mapa de expansión<br><span class=sub> Esfuerzo de presencia de marca · motor de co-locación · 12 capas</span>';return d};t.addTo(map);
+ d.innerHTML='MONTAGNE — Mapa de expansión<br><span class=sub> Esfuerzo de presencia de marca · motor de co-locación · 13 capas</span>';return d};t.addTo(map);
 const lg=L.control({position:'bottomright'});lg.onAdd=function(){const d=L.DomUtil.create('div','legend');
  L.DomEvent.disableClickPropagation(d);
  d.innerHTML=`<h4>Esfuerzo de presencia de marca</h4><div class=gesf></div><div class=row style="justify-content:space-between"><span>cubierto</span><span>esfuerzo alto</span></div>
@@ -179,7 +184,7 @@ const lg=L.control({position:'bottomright'});lg.onAdd=function(){const d=L.DomUt
  <h4>Locales MONTAGNE · 98</h4><div class=row><span class=dot style="background:#E2001A"></span>Calle</div><div class=row><span class=dot style="background:#8000ff"></span>Shopping</div><div class=row><span class=dot style="background:#ff8800"></span>Outlet</div>
  <h4>Candidatas · 16</h4><div class=row><span class=dot style="background:#d11149"></span>Greenfield</div><div class=row><span class=dot style="background:#0d9488"></span>Convertir</div><div class=row><span class=dot style="background:#475569"></span>Retail parcial</div>
  <h4>Polos ind./RIGI · 18</h4><div class=row><span class=sq style="background:#d40000"></span>Gap total</div><div class=row><span class=sq style="background:#ff9500"></span>Base sin local</div><div class=row><span class=sq style="background:#1aa11a"></span>Cubierto</div>
- <h4>Competencia monomarca · 90</h4><div class=row><span class=tri style="border-bottom:11px solid #000"></span>TNF·Salomon·Columbia·Merrell</div><div class=row><span class=tri style="border-bottom:11px solid #7c2d12"></span>Patagonia·Ansilta·Ombak</div><div class=row><span class=tri style="border-bottom:11px solid #0082c3"></span>Decathlon·Eddie Bauer·Rossignol</div><div class=row><span class=tri style="border-bottom:11px solid #ca8a04"></span>Rip Curl·Quiksilver·Billabong</div><div class=row><span class=tri style="border-bottom:11px solid #be123c"></span>Alpine Skate·Hummer·Campinox (arg)</div><h4>Multimarca outdoor · 217</h4><div class=row><span style="width:10px;height:10px;background:#ea7317;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>Vende competidores</div><div class=row><span style="width:10px;height:10px;background:#15803d;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>También vende MONTAGNE</div><h4>🎯 Captar multimarca · 211</h4><div class=row><span class=dot style="background:#dc2626"></span>Alta (MONTAGNE no vende ahí)</div><div class=row><span class=dot style="background:#f59e0b"></span>Media (ya hay mayorista)</div><div class=sub>tamaño = V_abs (canal 0.6 + demanda 0.4)</div><h4>🏬 Abrir tienda oficial · 179</h4><div class=grad></div><div class=row style="justify-content:space-between"><span>V bajo</span><span>V alto</span></div><div class=sub>localidades sin retail propio, coloreadas por V_abs</div><h4>🟣 Huella MONTAGNE · 235 localidades</h4><div class=row><span class=dot style="background:#E2001A"></span>Tiene local propio</div><div class=row><span class=dot style="background:#0d9488"></span>Solo franquicia</div><div class=row><span class=dot style="background:#8b5cf6"></span>Solo mayorista</div><div class=sub>tamaño = puntos de venta · el punto es el centro de la localidad: el listado interno no trae direcciones de franquicias ni mayoristas</div></details>`;return d};lg.addTo(map);
+ <h4>Competencia monomarca · 90 (57 outdoor + 33 adyacente)</h4><div class=row><span class=tri style="border-bottom:11px solid #000"></span>TNF·Salomon·Columbia·Merrell</div><div class=row><span class=tri style="border-bottom:11px solid #7c2d12"></span>Patagonia·Ansilta·Ombak</div><div class=row><span class=tri style="border-bottom:11px solid #0082c3"></span>Decathlon·Eddie Bauer·Rossignol</div><div class=row><span class=tri style="border-bottom:11px solid #ca8a04"></span>Rip Curl·Quiksilver·Billabong</div><div class=row><span class=tri style="border-bottom:11px solid #be123c"></span>Alpine Skate·Hummer·Campinox (arg)</div><h4>Multimarca outdoor · 217</h4><div class=row><span style="width:10px;height:10px;background:#ea7317;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>Vende competidores</div><div class=row><span style="width:10px;height:10px;background:#15803d;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>También vende MONTAGNE</div><h4>🎯 Captar multimarca · 211</h4><div class=row><span class=dot style="background:#dc2626"></span>Alta (MONTAGNE no vende ahí)</div><div class=row><span class=dot style="background:#f59e0b"></span>Media (ya hay mayorista)</div><div class=sub>tamaño = V_abs (canal 0.6 + demanda 0.4)</div><h4>🏬 Abrir tienda oficial · 179</h4><div class=grad></div><div class=row style="justify-content:space-between"><span>V bajo</span><span>V alto</span></div><div class=sub>localidades sin retail propio, coloreadas por V_abs</div><h4>🟣 Huella MONTAGNE · 235 localidades</h4><div class=row><span class=dot style="background:#E2001A"></span>Tiene local propio</div><div class=row><span class=dot style="background:#0d9488"></span>Solo franquicia</div><div class=row><span class=dot style="background:#8b5cf6"></span>Solo mayorista</div><div class=sub>tamaño = puntos de venta · el punto es el centro de la localidad: el listado interno no trae direcciones de franquicias ni mayoristas</div></details>`;return d};lg.addTo(map);
 const ASK={url:"https://kqwuvhfgykhjosglsznd.supabase.co/functions/v1/map-ask",key:"f11d29e631efdd48"};
 
 // ---- AGENTE: pregunta en castellano -> SQL sobre map_* -> respuesta ----
