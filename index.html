@@ -1,0 +1,245 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MONTAGNE — Mapa de expansión</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+ html,body{margin:0;height:100%;font-family:Montserrat,Arial,sans-serif}#map{position:absolute;inset:0}
+ .legend{background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.3);line-height:1.4;font-size:12px;max-width:250px;max-height:92vh;overflow:auto}
+ .legend h4{margin:8px 0 4px;font-size:12px}.legend h4:first-child{margin-top:0}
+ .legend summary{cursor:pointer;font-weight:700;margin-top:8px;color:#E2001A}
+ .legend details[open] summary{margin-bottom:4px}
+ .row{display:flex;align-items:center;gap:6px;margin:2px 0}
+ .dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid #555}
+ .sq{width:11px;height:11px;display:inline-block;border:1px solid #333;transform:rotate(45deg)}
+ .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;display:inline-block}
+ .grad{height:10px;width:100%;border-radius:3px;background:linear-gradient(90deg,#2166ac,#4daf4a,#ffdd00,#f46d43,#d73027)}
+ .gesf{height:10px;width:100%;border-radius:3px;background:linear-gradient(90deg,#1a9850,#a6d96a,#fee08b,#fdae61,#d73027)}
+ .lbl{background:none;border:none;box-shadow:none;padding:0;font:700 10px Montserrat,Arial;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff}
+ .lbl:before{display:none}.lbl .a{font-weight:700;font-size:9px;letter-spacing:.3px}
+ .title{background:#E2001A;color:#fff;padding:8px 12px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-weight:700}
+ .sub{font-weight:400;font-size:11px}.leaflet-popup-content{font-size:12px;line-height:1.45}b.k{color:#E2001A}
+ .ask{background:#fff;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.3);width:330px;font-size:12px;overflow:hidden}
+ .ask .cab{background:#E2001A;color:#fff;padding:7px 10px;font-weight:700;cursor:pointer;display:flex;justify-content:space-between}
+ .ask .cue{padding:10px;max-height:52vh;overflow:auto}
+ .ask textarea{width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:5px;padding:6px;font:12px Montserrat,Arial;resize:vertical;min-height:46px}
+ .ask button{margin-top:6px;background:#E2001A;color:#fff;border:0;border-radius:5px;padding:6px 12px;font-weight:700;cursor:pointer}
+ .ask button:disabled{background:#999;cursor:wait}
+ .ask .rta{margin-top:9px;line-height:1.5;white-space:pre-wrap}
+ .ask .meta{margin-top:7px;color:#666;font-size:11px}
+ .ask .meta code{background:#f3f3f3;padding:1px 3px;border-radius:3px;word-break:break-all;display:block;margin-top:3px}
+ .ask .ej{color:#E2001A;cursor:pointer;text-decoration:underline;display:block;margin:2px 0}
+ .ask table{border-collapse:collapse;margin-top:7px;font-size:11px;width:100%}
+ .ask th,.ask td{border:1px solid #e5e5e5;padding:2px 4px;text-align:left}
+ .ask th{background:#fafafa}
+ .carga{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f7f7f7;z-index:9999;font:700 14px Montserrat,Arial;color:#E2001A}
+</style></head><body><div id="map"></div><div id=carga class=carga>Cargando el mapa…</div><script>
+const FUENTE={url:"https://kqwuvhfgykhjosglsznd.supabase.co/functions/v1/map-data"};
+function iniciar(DATA){
+const map=L.map('map',{center:[-40,-64],zoom:5});
+// BASEMAPS: OSM.org bloquea tile requests de apps (403 Access blocked / tile usage policy)
+// y CARTO exige API key. ArcGIS Online sirve estos tiles publicos sin key.
+const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/';
+const ATR='Tiles &copy; Esri';
+const bClaro=L.layerGroup([
+  L.tileLayer(ESRI+'Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,maxNativeZoom:16,attribution:ATR}),
+  L.tileLayer(ESRI+'Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,maxNativeZoom:16})]);
+const bCalles=L.tileLayer(ESRI+'World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:ATR});
+const bTopo=L.tileLayer(ESRI+'World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:ATR});
+const bSat=L.layerGroup([
+  L.tileLayer(ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:ATR}),
+  L.tileLayer(ESRI+'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19})]);
+bClaro.addTo(map);
+// ---- ESFUERZO DE PRESENCIA DE MARCA (lectura regional) ----
+// Coropleta: mercado validado (competencia+multimarca+online) contra marca puesta
+// (propios/franquicias x3 + mayoristas), mas el trabajo concreto pendiente.
+const ACC={conquistar:['CONQUISTAR','#7f1d1d'],abrir_local:['ABRIR LOCAL','#b91c1c'],
+           captar_mayoristas:['CAPTAR MAYORISTAS','#c2410c'],cubierto:['CUBIERTO','#15803d']};
+function esfColor(v){const s=[[0,[26,152,80]],[20,[166,217,106]],[35,[254,224,139]],[50,[253,174,97]],[70,[215,48,39]]];
+ if(v<=0)return 'rgb(26,152,80)';
+ for(let i=1;i<s.length;i++){if(v<=s[i][0]){const a=s[i-1],b=s[i],t=(v-a[0])/(b[0]-a[0]),c=a[1].map((x,j)=>Math.round(x+(b[1][j]-x)*t));return `rgb(${c[0]},${c[1]},${c[2]})`;}}
+ return 'rgb(215,48,39)';}
+function mny(x){return x>=1e6?'$ '+(x/1e6).toFixed(1)+'M':'$ '+Math.round(x/1e3)+'k';}
+function esfStyle(u){return {color:'#fff',weight:1,fillColor:esfColor(u.esf),fillOpacity:.62};}
+function esfPopup(tit,sub,u,extra){const a=ACC[u.acc];
+ return `<b style="font-size:13px">${tit}</b> <span style="color:#666">${sub}</span><br>
+ <span style="background:${a[1]};color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">${a[0]}</span>
+ <b> esfuerzo ${u.esf}</b>/100 <span style="color:#666">(${u.niv})</span>
+ <hr style="border:none;border-top:1px solid #ddd;margin:5px 0">
+ <b class=k>Mercado validado ${u.pot}</b>/100 — competencia ${u.comp} · multimarca ${u.multi}<br>
+ Online ${mny(u.pag)} · ${u.ped} pedidos${u.pob?' · pobl. '+(u.pob/1e6).toFixed(2)+'M':''}<br>
+ <b class=k>Marca puesta ${u.pres}</b>/100 — ${u.P} propios · ${u.F} franquicias · ${u.M} mayoristas<br>
+ <b>Pendiente ${u.pend}</b>/100 — <b>${u.nab}</b> mercados validados sin local propio ·
+ <b>${u.cal}</b> multimarca en mercados sin mayorista MONTAGNE
+ <span style="color:#666">(${u.msin} multimarca sin MONTAGNE en total)</span><br>
+ <span style="color:#666">hueco relativo ${u.gap} (mercado ${u.pot} − marca ${u.pres})</span>
+ ${extra}`;}
+function esfList(lbl,arr){return arr&&arr.length?`<br><b>${lbl}:</b> ${arr.join(' · ')}`:'';}
+const gEsfProv=L.geoJSON(DATA.provgeo,{style:f=>esfStyle(f.properties.p),
+ onEachFeature:(f,l)=>{const u=f.properties.p;
+  l.bindPopup(esfPopup(f.properties.prov.toUpperCase(),'· '+f.properties.region,u,
+    esfList('Abrir local en',u.abrir)+esfList('Captar mayorista',u.captar)),{maxWidth:330});
+  l.on('mouseover',()=>l.setStyle({weight:3,color:'#111'})).on('mouseout',()=>l.setStyle(esfStyle(u)));}});
+const gEsfReg=L.geoJSON(DATA.provgeo,{style:f=>esfStyle(f.properties.r),
+ onEachFeature:(f,l)=>{const u=f.properties.r;
+  l.bindPopup(esfPopup(f.properties.region.toUpperCase(),'· región (índice normalizado entre regiones, no comparable con el provincial)',u,
+    esfList('Provincias por esfuerzo',u.top)),{maxWidth:330});
+  l.on('mouseover',()=>l.setStyle({weight:3,color:'#111'})).on('mouseout',()=>l.setStyle(esfStyle(u)));}});
+// etiquetas: provincia + esfuerzo + jugada, sobre el centroide del poligono mayor
+// La palanca solo se escribe donde hay esfuerzo: en 'cubierto' basta el indice, y
+// asi las etiquetas no se pisan en el NOA (centroides muy juntos).
+function esfLabels(rows,key){const g=L.layerGroup();
+ rows.forEach(r=>{const u=r[key];if(!u)return;const a=ACC[u.acc];
+  const txt=u.acc==='cubierto'?`<span class=a style="color:#166534">${u.esf}</span>`
+                              :`<span class=a style="color:${a[1]}">${u.esf} · ${a[0]}</span>`;
+  L.marker([r.lat,r.lng],{interactive:false,icon:L.divIcon({className:'lbl',iconSize:[104,26],iconAnchor:[52,13],
+   html:`<div style="text-align:center">${r.n.toUpperCase()}<br>${txt}</div>`})}).addTo(g);});
+ return g;}
+const gLabProv=esfLabels(DATA.provlab,'p'), gLabReg=esfLabels(DATA.reglab,'r');
+const capaProv=L.layerGroup([gEsfProv,gLabProv]).addTo(map);
+const capaReg=L.layerGroup([gEsfReg,gLabReg]);
+// HEATMAPS (ventas online) — apagado por defecto: pisa la coropleta
+const grad={0.0:'#2166ac',0.35:'#4daf4a',0.6:'#ffdd00',0.8:'#f46d43',1.0:'#d73027'};
+const heatPag=L.heatLayer(DATA.heatPag,{radius:11,blur:7,maxZoom:11,minOpacity:.45,gradient:grad,max:1.0});
+const heatPed=L.heatLayer(DATA.heatPed,{radius:11,blur:7,maxZoom:11,minOpacity:.45,gradient:grad,max:1.0});
+// LOCALES
+const cCanal={'Calle':'#E2001A','Shopping':'#8000ff','Outlet':'#ff8800'};
+const gStores=L.layerGroup();
+DATA.stores.forEach(s=>{const col=s.est==='cerrado'?'#999':(cCanal[s.c]||'#E2001A');
+ L.circleMarker([s.lat,s.lng],{radius:3.5,color:'#222',weight:.6,fillColor:col,fillOpacity:.95})
+  .bindPopup(`<b class=k>MONTAGNE</b> · ${s.c}${s.est==='cerrado'?' <b>(CERRADO)</b>':''}<br><b>${s.n}</b>, ${s.p}<br>${s.d}`).addTo(gStores);});
+// CANDIDATAS
+const tCol={gf:'#d11149',cv:'#0d9488',pc:'#475569'};
+const tTxt={gf:'GREENFIELD (sin presencia)',cv:'CONVERTIR (solo mayorista)',pc:'RETAIL PARCIAL'};
+const gCand=L.layerGroup();
+DATA.cand.forEach(c=>{L.marker([c.lat,c.lng],{icon:L.divIcon({className:'',html:
+   `<div style="background:${tCol[c.tier]};color:#fff;border:2px solid #fff;border-radius:50%;width:24px;height:24px;line-height:20px;text-align:center;font-weight:700;font-size:11px;box-shadow:0 1px 4px rgba(0,0,0,.6)">${c.rank}</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
+  .bindPopup(`<b style="color:${tCol[c.tier]}">#${c.rank} · ${tTxt[c.tier]}</b><br><b>${c.n}</b> · score ${c.score}/10<br>Canales: ${c.P}P · ${c.F}F · ${c.M}M`).addTo(gCand);});
+// POLOS
+const stCol={gap:'#d40000',base:'#ff9500',cubierto:'#1aa11a',cerrado:'#777'};
+const stTxt={gap:'GAP total',base:'Base del polo SIN local',cubierto:'Cubierto',cerrado:'Local cerrado'};
+const gHub=L.layerGroup();
+DATA.hubs.forEach(h=>{L.marker([h.lat,h.lng],{icon:L.divIcon({className:'',html:
+   `<div style="background:${stCol[h.st]};border:2px solid #fff;width:15px;height:15px;transform:rotate(45deg);box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,iconSize:[15,15],iconAnchor:[7,7]})})
+  .bindPopup(`<b style="color:${stCol[h.st]}">POLO · ${stTxt[h.st]}</b><br><b>${h.n}</b><br>${h.base}, ${h.p}<br>${h.sec} · ${h.inv}`).addTo(gHub);});
+// COMPETENCIA
+const brand={'Salomon':'#1f6fb2','The North Face':'#000000','Columbia':'#16a34a','Merrell':'#b45309','Ansilta':'#7c3aed','Timberland':'#a16207','Ombak':'#db2777','Patagonia':'#7c2d12','Eddie Bauer':'#0e7490','Rossignol':'#4338ca','Decathlon':'#0082c3','Rip Curl':'#ca8a04','Quiksilver':'#0ea5e9','Billabong':'#334155','Alpine Skate':'#be123c','Hummer':'#78350f','Campinox':'#4d7c0f'};
+const gComp=L.layerGroup();
+DATA.comp.forEach(x=>{const col=brand[x.m]||'#333';
+ L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:`<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid ${col};filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))"></div>`,iconSize:[14,13],iconAnchor:[7,13]})})
+  .bindPopup(`<b style="color:${col}">COMPETIDOR · ${x.m}</b><br>${x.ciu} · ${x.c}`).addTo(gComp);});
+const gMulti=L.layerGroup();
+DATA.multi.forEach(x=>{const col=x.mtg?'#15803d':'#ea7317';
+ L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:`<div style="width:9px;height:9px;background:${col};border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div>`,iconSize:[9,9],iconAnchor:[4,4]})}).bindPopup(`<b style="color:${col}">MULTIMARCA OUTDOOR</b>${x.mtg?' · vende MONTAGNE':''}<br><b>${x.name}</b>${x.city?' — '+x.city:''}<br><span style="color:#555">vende: ${x.brands.join(', ')}</span>`).addTo(gMulti);});
+gMulti.addTo(map);
+// ---- MOTOR DE CO-LOCACION: 2 capas nuevas ----
+function heatColor(v){v=Math.max(0,Math.min(1,v));const s=[[0,[33,102,171]],[0.35,[77,175,74]],[0.6,[255,221,0]],[0.8,[244,109,67]],[1,[215,48,39]]];for(let i=1;i<s.length;i++){if(v<=s[i][0]){const a=s[i-1],b=s[i],t=(v-a[0])/(b[0]-a[0]),c=a[1].map((x,j)=>Math.round(x+(b[1][j]-x)*t));return `rgb(${c[0]},${c[1]},${c[2]})`;}}return 'rgb(215,48,39)';}
+const gCaptar=L.layerGroup();
+DATA.captar.forEach(c=>{const col=c.pr==='alta'?'#dc2626':'#f59e0b';
+ L.circleMarker([c.lat,c.lng],{radius:4+(c.v/100)*8,color:'#fff',weight:1,fillColor:col,fillOpacity:.9})
+  .bindPopup(`<b style="color:${col}">🎯 CAPTAR MULTIMARCA · prioridad ${c.pr}</b><br><b>${c.t}</b>${c.l?' — '+c.l:''}<br>V_abs <b>${c.v}</b> · MONTAGNE mayorista: <b>${c.m>0?'sí':'no'}</b><br><span style="color:#555">vende: ${c.b}</span>`).addTo(gCaptar);});
+const gTienda=L.layerGroup();
+DATA.tienda.forEach(t=>{const col=heatColor(t.v/100);
+ L.circleMarker([t.lat,t.lng],{radius:4+(t.v/100)*10,color:'#111',weight:.8,fillColor:col,fillOpacity:.85})
+  .bindPopup(`<b>🏬 ABRIR TIENDA OFICIAL</b><br><b>${t.l}</b>, ${t.p}<br>V_abs <b>${t.v}</b>${t.vpc!==null?' · V_pc '+t.vpc:''}<br>online $ ${(t.pag/1e6).toFixed(1)}M · comp ${t.c} · multi ${t.mu} · MONTAGNE may. ${t.m}`).addTo(gTienda);});
+L.control.layers({'Mapa claro':bClaro,'Calles':bCalles,'Topográfico':bTopo,'Satélite':bSat},{
+ '🗺️ ESFUERZO de marca · provincia':capaProv,
+ '🌎 ESFUERZO de marca · región':capaReg,
+ '🔥 Calor: ventas online ($)':heatPag,
+ '🔥 Calor: pedidos online':heatPed,
+ '📍 Locales MONTAGNE (98)':gStores,
+ '🔵 Candidatas (16)':gCand,
+ '◆ Polos ind./RIGI (18)':gHub,
+ '▲ Competencia (90)':gComp,
+ '▣ Multimarca outdoor (217)':gMulti,
+ '🎯 Captar multimarca (211)':gCaptar,
+ '🏬 Abrir tienda oficial (24)':gTienda
+},{collapsed:false}).addTo(map);
+const t=L.control({position:'topleft'});t.onAdd=function(){const d=L.DomUtil.create('div','title');
+ d.innerHTML='MONTAGNE — Mapa de expansión<br><span class=sub> Esfuerzo de presencia de marca · motor de co-locación · 11 capas</span>';return d};t.addTo(map);
+const lg=L.control({position:'bottomright'});lg.onAdd=function(){const d=L.DomUtil.create('div','legend');
+ L.DomEvent.disableClickPropagation(d);
+ d.innerHTML=`<h4>Esfuerzo de presencia de marca</h4><div class=gesf></div><div class=row style="justify-content:space-between"><span>cubierto</span><span>esfuerzo alto</span></div>
+ <div class=sub>mitad hueco (mercado validado − marca puesta) + mitad pendiente (mercados sin local×3 + multimarca a captar)</div>
+ <div class=row><span class=dot style="background:#7f1d1d"></span>Conquistar: sin local ni mayorista</div>
+ <div class=row><span class=dot style="background:#b91c1c"></span>Abrir local: mercado validado sin retail</div>
+ <div class=row><span class=dot style="background:#c2410c"></span>Captar mayoristas: multimarca sin MONTAGNE</div>
+ <div class=row><span class=dot style="background:#15803d"></span>Cubierto: presencia acorde al mercado</div>
+ <details><summary>Otras capas del mapa</summary>
+ <h4>Calor — ventas online</h4><div class=grad></div><div class=row style="justify-content:space-between"><span>menos</span><span>más</span></div>
+ <h4>Locales MONTAGNE · 98</h4><div class=row><span class=dot style="background:#E2001A"></span>Calle</div><div class=row><span class=dot style="background:#8000ff"></span>Shopping</div><div class=row><span class=dot style="background:#ff8800"></span>Outlet</div>
+ <h4>Candidatas · 16</h4><div class=row><span class=dot style="background:#d11149"></span>Greenfield</div><div class=row><span class=dot style="background:#0d9488"></span>Convertir</div><div class=row><span class=dot style="background:#475569"></span>Retail parcial</div>
+ <h4>Polos ind./RIGI · 18</h4><div class=row><span class=sq style="background:#d40000"></span>Gap total</div><div class=row><span class=sq style="background:#ff9500"></span>Base sin local</div><div class=row><span class=sq style="background:#1aa11a"></span>Cubierto</div>
+ <h4>Competencia monomarca · 90</h4><div class=row><span class=tri style="border-bottom:11px solid #000"></span>TNF·Salomon·Columbia·Merrell</div><div class=row><span class=tri style="border-bottom:11px solid #7c2d12"></span>Patagonia·Ansilta·Ombak</div><div class=row><span class=tri style="border-bottom:11px solid #0082c3"></span>Decathlon·Eddie Bauer·Rossignol</div><div class=row><span class=tri style="border-bottom:11px solid #ca8a04"></span>Rip Curl·Quiksilver·Billabong</div><div class=row><span class=tri style="border-bottom:11px solid #be123c"></span>Alpine Skate·Hummer·Campinox (arg)</div><h4>Multimarca outdoor · 217</h4><div class=row><span style="width:10px;height:10px;background:#ea7317;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>Vende competidores</div><div class=row><span style="width:10px;height:10px;background:#15803d;display:inline-block;border:1px solid #fff;box-shadow:0 0 0 1px #999"></span>También vende MONTAGNE</div><h4>🎯 Captar multimarca · 211</h4><div class=row><span class=dot style="background:#dc2626"></span>Alta (MONTAGNE no vende ahí)</div><div class=row><span class=dot style="background:#f59e0b"></span>Media (ya hay mayorista)</div><div class=sub>tamaño = V_abs (canal 0.6 + demanda 0.4)</div><h4>🏬 Abrir tienda oficial · 24</h4><div class=grad></div><div class=row style="justify-content:space-between"><span>V bajo</span><span>V alto</span></div><div class=sub>localidades sin retail propio, coloreadas por V_abs</div></details>`;return d};lg.addTo(map);
+const ASK={url:"https://kqwuvhfgykhjosglsznd.supabase.co/functions/v1/map-ask",key:"f11d29e631efdd48"};
+
+// ---- AGENTE: pregunta en castellano -> SQL sobre map_* -> respuesta ----
+const EJEMPLOS=['¿Dónde abro locales primero y por qué?',
+ '¿Cuánto factura online cada región y qué presencia tengo?',
+ '¿Qué multimarca de Ushuaia no venden MONTAGNE?',
+ '¿En qué provincias no tengo ni un local propio?'];
+const ask=L.control({position:'topleft'});
+ask.onAdd=function(){const d=L.DomUtil.create('div','ask');
+ L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);
+ d.innerHTML=`<div class=cab id=akc><span>🤖 Preguntale a los datos</span><span id=akt>▾</span></div>
+  <div class=cue id=akq><textarea id=akin placeholder="${EJEMPLOS[0]}"></textarea>
+  <button id=akb>Preguntar</button>
+  <div class=meta id=akej>Ejemplos:</div>
+  <div class=rta id=akr></div><div id=akm></div></div>`;
+ return d};
+ask.addTo(map);
+(function(){
+ const cab=document.getElementById('akc'),cue=document.getElementById('akq'),
+       tri=document.getElementById('akt'),inp=document.getElementById('akin'),
+       btn=document.getElementById('akb'),rta=document.getElementById('akr'),
+       met=document.getElementById('akm'),ejs=document.getElementById('akej');
+ EJEMPLOS.forEach(e=>{const s=document.createElement('span');s.className='ej';s.textContent=e;
+   s.onclick=()=>{inp.value=e;preguntar();};ejs.appendChild(s);});
+ cab.onclick=()=>{const v=cue.style.display==='none';cue.style.display=v?'':'none';tri.textContent=v?'▾':'▸';};
+ cue.style.display='none';tri.textContent='▸';
+ function tabla(datos){if(!datos||!datos.length)return '';
+   const cols=Object.keys(datos[0]).slice(0,5),fil=datos.slice(0,8);
+   return '<table><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+     fil.map(r=>'<tr>'+cols.map(c=>`<td>${r[c]===null?'':r[c]}</td>`).join('')+'</tr>').join('')+
+     '</table>'+(datos.length>fil.length?`<div class=meta>+${datos.length-fil.length} filas más</div>`:'');}
+ async function preguntar(){const q=inp.value.trim();if(!q)return;
+   btn.disabled=true;btn.textContent='Consultando…';rta.textContent='';met.innerHTML='';
+   try{
+     const h={'Content-Type':'application/json'};if(ASK.key)h['x-map-key']=ASK.key;
+     const res=await fetch(ASK.url,{method:'POST',headers:h,body:JSON.stringify({pregunta:q})});
+     const j=await res.json();
+     if(j.error){rta.textContent='Error: '+j.error;}
+     else{rta.textContent=j.respuesta;
+          met.innerHTML=(j.sql?`<div class=meta>${j.filas} filas · SQL:<code>${j.sql}</code></div>`:'')+tabla(j.datos);}
+   }catch(e){rta.textContent='No pude consultar al agente: '+e;}
+   btn.disabled=false;btn.textContent='Preguntar';}
+ btn.onclick=preguntar;
+ inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey))preguntar();});
+})();
+
+}
+
+(async function(){
+ const caja=document.getElementById('carga');
+ function pedirClave(){
+  const u=new URL(location.href);
+  return u.searchParams.get('k')||u.hash.replace(/^#/,'')||localStorage.getItem('mtgk')||'';
+ }
+ let k=pedirClave();
+ if(!k)k=(prompt('Clave de acceso al mapa MONTAGNE')||'').trim();
+ if(!k){caja.textContent='Hace falta la clave de acceso.';return;}
+ caja.textContent='Cargando datos…';
+ try{
+  const r=await fetch(FUENTE.url,{method:'POST',headers:{'Content-Type':'application/json','x-map-key':k}});
+  if(r.status===401){localStorage.removeItem('mtgk');
+   caja.innerHTML='Clave incorrecta. <a href="#" onclick="location.reload()">Reintentar</a>';return;}
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  if(d.error)throw new Error(d.error);
+  localStorage.setItem('mtgk',k);
+  history.replaceState(null,'',location.pathname);   // no dejar la clave en la barra
+  caja.remove();
+  iniciar(d);
+ }catch(e){caja.textContent='No pude cargar los datos: '+e.message;}
+})();
+</script></body></html>
